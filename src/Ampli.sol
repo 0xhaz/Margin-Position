@@ -105,4 +105,18 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
 
     /// @notice Helper function to calculate the interest rate
     /// @return uint The interest rate in UD18
+    function _calculateInterestRate() private view returns (uint256) {
+        InterestMode interestMode = interestMode();
+        uint40 maxInterestRateUD18 = maxInterestRate();
+        uint256 exchangeRateUD18 = s_exchangeRate.currentUD18;
+
+        uint256 annualInterestRateUD18 = (
+            interestMode == InterestMode.Intensified
+                ? mulDiv(exchangeRateUD18, exchangeRateUD18)
+                : (interestMode == InterestMode.Normal ? exchangeRateUD18 : sqrt(exchangeRateUD18))
+        ) - Constants.ONE_UD18;
+        uint256 interestRateUD18 = annualInterestRateUD18 / Constants.SECONDS_PER_YEAR;
+
+        return interestRateUD18 >= maxInterestRateUD18 ? maxInterestRateUD18 : interestRateUD18;
+    }
 }
