@@ -16,5 +16,5 @@ library Constants {
     /// @notice Constant for representing 1 in pips notation
     uint256 internal constant ONE_PIPS = 1_000_000;
     /// @notice Constant for representing seconds in a year
-    uint256 internal constant SECODS_PER_YEAR = 31536000;
+    uint256 internal constant SECONDS_PER_YEAR = 31536000;
 }

@@ -87,6 +87,39 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         _adjustExchangeRate(sqrtPriceX96, false);
 
         callbackResult = IUnlockCallback(msg.sender).unlockCallback(callbackData);
+
+        uint256[] memory checkedOutPositions = s_lock.checkedOutItems;
+        uint256 len = checkedOutPositions.length;
+        for (uint256 i; i < len; ++i) {
+            Position storage s_position = s_positions[checkedOutPositions[i]];
+            (uint256 value, uint256 marginReq) =
+                s_position.appraise(this, Fungible.wrap(address(this)), s_exchangeRate.currentUD18);
+            uint256 debt = s_position.nominalDebt(s_deflators.interestAndFeeUD18);
+
+            if (value < marginReq + debt || debt > mulDiv18(value, maxDebtRatio())) {
+                revert PositionAtRisk(checkedOutPositions[i]);
+            }
+        }
+
+        s_lock.checkInAll();
+
+        s_lock.lock();
+    }
+
+    /// @inheritdoc IAmpli
+    function openPosition(address originator) external noDelegateCall returns (uint256 positionId) {
+        s_positions[(positionId = ++s_lastPositionId)].open(msg.sender, originator);
+
+        emit PositionOpened(positionId, msg.sender, originator);
+    }
+
+    /// @inheritdoc IAmpli
+    function closePosition(uint256 positionId) external noDelegateCall {
+        if (msg.sender != s_positions[positionId].owner) revert NotOwner();
+
+        s_positions[positionId].close();
+
+        emit PositionClosed(positionId);
     }
 
     /// @notice Helper function to disburse interest to active liquidity providers, as frequently as each block
@@ -103,6 +136,17 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         }
     }
 
+    /// @notice Helper function to adjust the exchange rate based on the square root price
+    /// @param sqrtPriceX96 The square root price in Q96
+    /// @param hasSqrtPriceChanged Whether the square root price has changed
+    function _adjustExchangeRate(uint256 sqrtPriceX96, bool hasSqrtPriceChanged) private {
+        uint256 targetExchangeRateUD18 =
+            mulDiv(mulDiv(sqrtPriceX96, sqrtPriceX96, Constants.ONE_Q96), Constants.ONE_UD18, Constants.ONE_Q96);
+        assert(targetExchangeRateUD18 > Constants.ONE_UD18); // target exchange rate must be greater than 1
+
+        s_exchangeRate.adjust(targetExchangeRateUD18, hasSqrtPriceChanged, maxExchangeRateAdjRatio());
+    }
+
     /// @notice Helper function to calculate the interest rate
     /// @return uint The interest rate in UD18
     function _calculateInterestRate() private view returns (uint256) {
@@ -112,7 +156,7 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
 
         uint256 annualInterestRateUD18 = (
             interestMode == InterestMode.Intensified
-                ? mulDiv(exchangeRateUD18, exchangeRateUD18)
+                ? mulDiv18(exchangeRateUD18, exchangeRateUD18)
                 : (interestMode == InterestMode.Normal ? exchangeRateUD18 : sqrt(exchangeRateUD18))
         ) - Constants.ONE_UD18;
         uint256 interestRateUD18 = annualInterestRateUD18 / Constants.SECONDS_PER_YEAR;
