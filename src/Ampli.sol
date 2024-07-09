@@ -122,6 +122,15 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         emit PositionClosed(positionId);
     }
 
+    /// @inheritdoc IAmpli
+    function depositFungible(uint256 positionId, Fungible fungible, uint256 amount) external payable noDelegateCall {
+        if (!s_positions[positionId].exists()) revert PositionDoesNotExist();
+
+        _addFungible(positionId, fungible, amount);
+
+        emit FungibleDeposited(positionId, msg.sender, fungible, amount);
+    }
+
     /// @notice Helper function to disburse interest to active liquidity providers, as frequently as each block
     function _disburseInterest() private {
         (uint256 interestDeflatorGrowthUD18,) = s_deflators.grow(_calculateInterestRate(), feeRate());
@@ -134,6 +143,21 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
             _mint(address(poolManager), interest);
             poolManager.settle(Currency.wrap(address(this)));
         }
+    }
+
+    /// @notice Helper function to add some amount of a fungible to a position
+    /// @param positionId The ID of the position
+    /// @param fungible The fungible to add
+    /// @param amount The amount to add
+    function _addFungible(uint256 positionId, Fungible fungible, uint256 amount) private {
+        Position storage s_globalPosition = s_positions[GLOBAL_POSITION_ID];
+
+        uint256 received = fungible.balanceOf(address(this)) - s_globalPosition.fungibleAssets[fungible].balance
+            - (fungible == FungibleLibrary.NATIVE ? s_surplus : 0);
+        if (received < amount) revert FungibleAmountNotRecieved();
+
+        s_positions[positionId].addFungible(fungible, amount);
+        s_globalPosition.addFungible(fungible, amount);
     }
 
     /// @notice Helper function to adjust the exchange rate based on the square root price
