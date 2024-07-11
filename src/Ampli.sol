@@ -131,6 +131,20 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         emit FungibleDeposited(positionId, msg.sender, fungible, amount);
     }
 
+    /// @inheritdoc IAmpli
+    function withdrawFungible(uint256 positionId, Fungible fungible, uint256 amount, address recipient)
+        external
+        noDelegateCall
+    {
+        if (msg.sender != s_positions[positionId].owner) revert NotOwner();
+        s_lock.checkOut(positionId);
+
+        _removeFungible(positionId, fungible, amount);
+        fungible.transfer(recipient, amount);
+
+        emit FungibleWithdrawn(positionId, recipient, fungible, amount);
+    }
+
     /// @notice Helper function to disburse interest to active liquidity providers, as frequently as each block
     function _disburseInterest() private {
         (uint256 interestDeflatorGrowthUD18,) = s_deflators.grow(_calculateInterestRate(), feeRate());
@@ -158,6 +172,18 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
 
         s_positions[positionId].addFungible(fungible, amount);
         s_globalPosition.addFungible(fungible, amount);
+    }
+
+    /// @notice Helper function to remove some amount of a fungible from a position
+    /// @param positionId The position ID
+    /// @param fungible The fungible to remove
+    /// @param amount The amount to remove
+    function _removeFungible(uint256 positionId, Fungible fungible, uint256 amount) private {
+        Position storage s_position = s_positions[positionId];
+        if (s_position.fungibleAssets[fungible].balance < amount) revert FungibleBalanceInsufficient();
+
+        s_position.removeFungible(fungible, amount);
+        s_positions[GLOBAL_POSITION_ID].removeFungible(fungible, amount);
     }
 
     /// @notice Helper function to adjust the exchange rate based on the square root price
