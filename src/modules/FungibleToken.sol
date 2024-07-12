@@ -42,6 +42,13 @@ abstract contract FungibleToken is IERC20, IERC165 {
     }
 
     /// @inheritdoc IERC20
+    function transfer(address to, uint256 amount) public returns (bool) {
+        _transfer(msg.sender, to, amount);
+
+        return true;
+    }
+
+    /// @inheritdoc IERC20
     function transferFrom(address from, address to, uint256 amount) public returns (bool) {
         uint256 currentAllowance = s_ownerData[from].allowances[msg.sender];
 

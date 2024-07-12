@@ -148,8 +148,12 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
     /// @inheritdoc IAmpli
     function depositNonFungible(uint256 positionId, NonFungible nonFungible, uint256 item) external noDelegateCall {
         if (!s_positions[positionId].exists()) revert PositionDoesNotExist();
-        if (nonFungible.ownerOf(item) != address(this)) revert NonFungibleItemNotRecieved();
-        if (s_nonFungibleItemPositions[nonFungible][item] != 0) revert NonFungibleItemAlreadyDeposited();
+        if (nonFungible.ownerOf(item) != address(this)) {
+            revert NonFungibleItemNotRecieved();
+        }
+        if (s_nonFungibleItemPositions[nonFungible][item] != 0) {
+            revert NonFungibleItemAlreadyDeposited();
+        }
 
         s_positions[positionId].addNonFungible(nonFungible, item);
         s_positions[GLOBAL_POSITION_ID].addNonFungible(nonFungible, item);
@@ -164,7 +168,9 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         noDelegateCall
     {
         if (msg.sender != s_positions[positionId].owner) revert NotOwner();
-        if (s_nonFungibleItemPositions[nonFungible][item] != positionId) revert NonFungibleItemNotInPosition();
+        if (s_nonFungibleItemPositions[nonFungible][item] != positionId) {
+            revert NonFungibleItemNotInPosition();
+        }
         s_lock.checkOut(positionId);
 
         s_positions[positionId].removeNonFungible(nonFungible, item);
@@ -181,8 +187,8 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         s_lock.checkOut(positionId);
 
         _mint(recipient, amount);
-        uint256 realAmount = mulDiv(amount, Constants.ONE_UD18, s_deflators.interestAndFeeUD18) + 1; // lazy rounding up
-        s_positions[GLOBAL_POSITION_ID].realDebt += realAmount; // overflow protection
+        uint256 realAmount = mulDiv(amount, Constants.ONE_UD18, s_deflators.interestAndFeeUD18) + 1; // lazy round up
+        s_positions[GLOBAL_POSITION_ID].realDebt += realAmount; // overflow desired
         unchecked {
             s_positions[positionId].realDebt += realAmount;
         }
@@ -200,7 +206,7 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
 
         _burn(address(this), amount);
         uint256 realAmount = mulDiv(amount, Constants.ONE_UD18, s_deflators.interestAndFeeUD18);
-        s_positions[positionId].realDebt -= realAmount;
+        s_positions[positionId].realDebt -= realAmount; // underflow desired
         unchecked {
             s_positions[GLOBAL_POSITION_ID].realDebt -= realAmount;
         }
@@ -348,22 +354,64 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
                 _mint(address(poolManager), amount);
                 poolManager.settle(Currency.wrap(address(this)));
                 poolManager.take(CurrencyLibrary.NATIVE, address(this), uint128(delta.amount0()));
+
+                (sqrtPriceX96,,,) = poolManager.getSlot0(key.toId());
             }
+
+            _adjustExchangeRate(sqrtPriceX96, true);
         }
+
+        return (this.afterSwap.selector, 0);
     }
 
-    /// @notice Helper function to disburse interest to active liquidity providers, as frequently as each block
-    function _disburseInterest() private {
-        (uint256 interestDeflatorGrowthUD18,) = s_deflators.grow(_calculateInterestRate(), feeRate());
+    /// @inheritdoc IAmpli
+    function nextPositionId() public view returns (uint256) {
+        return s_lastPositionId + 1;
+    }
 
-        if (interestDeflatorGrowthUD18 > 0) {
-            uint256 interest = mulDiv18(s_positions[GLOBAL_POSITION_ID].realDebt, interestDeflatorGrowthUD18);
+    /// @inheritdoc IAmpli
+    function deficit() public view returns (uint256) {
+        return s_deficit;
+    }
 
-            IPoolManager poolManager = s_poolManager;
-            poolManager.donate(s_poolKey, 0, interest, "");
-            _mint(address(poolManager), interest);
-            poolManager.settle(Currency.wrap(address(this)));
-        }
+    /// @inheritdoc IAmpli
+    function surplus() public view returns (uint256) {
+        return s_surplus;
+    }
+
+    /// @inheritdoc IAmpli
+    function ownerOf(uint256 positionId) public view returns (address) {
+        return s_positions[positionId].owner;
+    }
+
+    /// @inheritdoc IAmpli
+    function originatorOf(uint256 positionId) public view returns (address) {
+        return s_positions[positionId].originator;
+    }
+
+    /// @inheritdoc IAmpli
+    function balanceOf(uint256 positionId, Fungible fungible) public view returns (uint256) {
+        return s_positions[positionId].fungibleAssets[fungible].balance;
+    }
+
+    /// @inheritdoc IAmpli
+    function itemsCountOf(uint256 positionId, NonFungible nonFungible) public view returns (uint256) {
+        return s_positions[positionId].nonFungibleAssets[nonFungible].items.length;
+    }
+
+    /// @inheritdoc IAmpli
+    function positionOf(NonFungible nonFungible, uint256 item) public view returns (uint256) {
+        return s_nonFungibleItemPositions[nonFungible][item];
+    }
+
+    /// @inheritdoc IAmpli
+    function globalBalanceOf(Fungible fungible) public view returns (uint256) {
+        return s_positions[GLOBAL_POSITION_ID].fungibleAssets[fungible].balance;
+    }
+
+    /// @inheritdoc IAmpli
+    function globalItemsCountOf(NonFungible nonFungible) public view returns (uint256) {
+        return s_positions[GLOBAL_POSITION_ID].nonFungibleAssets[nonFungible].items.length;
     }
 
     /// @notice Helper function to add some amount of a fungible to a position
@@ -387,10 +435,27 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
     /// @param amount The amount to remove
     function _removeFungible(uint256 positionId, Fungible fungible, uint256 amount) private {
         Position storage s_position = s_positions[positionId];
-        if (s_position.fungibleAssets[fungible].balance < amount) revert FungibleBalanceInsufficient();
+        if (s_position.fungibleAssets[fungible].balance < amount) {
+            revert FungibleBalanceInsufficient();
+        }
 
         s_position.removeFungible(fungible, amount);
         s_positions[GLOBAL_POSITION_ID].removeFungible(fungible, amount);
+    }
+
+    /// @notice Helper function to disburse interest to active liquidity providers, as frequently as each block
+
+    function _disburseInterest() private {
+        (uint256 interestDeflatorGrowthUD18,) = s_deflators.grow(_calculateInterestRate(), feeRate());
+
+        if (interestDeflatorGrowthUD18 > 0) {
+            uint256 interest = mulDiv18(s_positions[GLOBAL_POSITION_ID].realDebt, interestDeflatorGrowthUD18);
+
+            IPoolManager poolManager = s_poolManager;
+            poolManager.donate(s_poolKey, 0, interest, "");
+            _mint(address(poolManager), interest);
+            poolManager.settle(Currency.wrap(address(this)));
+        }
     }
 
     /// @notice Helper function to adjust the exchange rate based on the square root price
@@ -404,8 +469,8 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         s_exchangeRate.adjust(targetExchangeRateUD18, hasSqrtPriceChanged, maxExchangeRateAdjRatio());
     }
 
-    /// @notice Helper function to calculate the interest rate
-    /// @return uint The interest rate in UD18
+    /// @notice Helper function to calculate the interest rate.
+    /// @return uint256 The interest rate in UD18
     function _calculateInterestRate() private view returns (uint256) {
         InterestMode interestMode = interestMode();
         uint40 maxInterestRateUD18 = maxInterestRate();
@@ -421,13 +486,13 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         return interestRateUD18 >= maxInterestRateUD18 ? maxInterestRateUD18 : interestRateUD18;
     }
 
-    /// @notice Helper function to calculate the amount to swap before fees
+    /// @notice Helper function to calculate the amount to swap before fees.
     /// @param amount The amount to swap
     /// @param fee The fee in pips
-    /// @return uin128 The amount to swap before fees
+    /// @return uint128 The amount before fees
     function _amountBeforeFee(uint128 amount, uint24 fee) private pure returns (uint128) {
-        uint256 amountBeforeFee = mulDiv(amount, Constants.ONE_PIPS, Constants.ONE_PIPS - fee) + 1; // lazy rounding up
-        assert(amountBeforeFee < type(uint128).max); // overflow protection
+        uint256 amountBeforeFee = mulDiv(amount, Constants.ONE_PIPS, Constants.ONE_PIPS - fee) + 1; // lazy round up
+        assert(amountBeforeFee < type(uint128).max);
 
         return uint128(amountBeforeFee);
     }

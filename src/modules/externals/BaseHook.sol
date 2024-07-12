@@ -58,12 +58,24 @@ abstract contract BaseHook is IHooks {
         revert HookNotImplemented();
     }
 
-    function afterRemoveLiquidity(
+    /// @inheritdoc IHooks
+    function beforeRemoveLiquidity(
         address,
         PoolKey calldata,
         IPoolManager.ModifyLiquidityParams calldata,
         bytes calldata
     ) external virtual returns (bytes4) {
+        revert HookNotImplemented();
+    }
+
+    /// @inheritdoc IHooks
+    function afterRemoveLiquidity(
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
+        BalanceDelta,
+        bytes calldata
+    ) external virtual returns (bytes4, BalanceDelta) {
         revert HookNotImplemented();
     }
 
