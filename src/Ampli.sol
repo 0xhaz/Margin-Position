@@ -89,8 +89,7 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         callbackResult = IUnlockCallback(msg.sender).unlockCallback(callbackData);
 
         uint256[] memory checkedOutPositions = s_lock.checkedOutItems;
-        uint256 len = checkedOutPositions.length;
-        for (uint256 i; i < len; ++i) {
+        for (uint256 i = 0; i < checkedOutPositions.length; i++) {
             Position storage s_position = s_positions[checkedOutPositions[i]];
             (uint256 value, uint256 marginReq) =
                 s_position.appraise(this, Fungible.wrap(address(this)), s_exchangeRate.currentUD18);
@@ -148,12 +147,9 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
     /// @inheritdoc IAmpli
     function depositNonFungible(uint256 positionId, NonFungible nonFungible, uint256 item) external noDelegateCall {
         if (!s_positions[positionId].exists()) revert PositionDoesNotExist();
-        if (nonFungible.ownerOf(item) != address(this)) {
-            revert NonFungibleItemNotRecieved();
-        }
-        if (s_nonFungibleItemPositions[nonFungible][item] != 0) {
-            revert NonFungibleItemAlreadyDeposited();
-        }
+        if (nonFungible.ownerOf(item) != address(this)) revert NonFungibleItemNotRecieved();
+
+        if (s_nonFungibleItemPositions[nonFungible][item] != 0) revert NonFungibleItemAlreadyDeposited();
 
         s_positions[positionId].addNonFungible(nonFungible, item);
         s_positions[GLOBAL_POSITION_ID].addNonFungible(nonFungible, item);
@@ -168,9 +164,7 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
         noDelegateCall
     {
         if (msg.sender != s_positions[positionId].owner) revert NotOwner();
-        if (s_nonFungibleItemPositions[nonFungible][item] != positionId) {
-            revert NonFungibleItemNotInPosition();
-        }
+        if (s_nonFungibleItemPositions[nonFungible][item] != positionId) revert NonFungibleItemNotInPosition();
         s_lock.checkOut(positionId);
 
         s_positions[positionId].removeNonFungible(nonFungible, item);
@@ -435,9 +429,7 @@ contract Ampli is IAmpli, BaseHook, FungibleToken, NonFungibleTokenReceiver, Ris
     /// @param amount The amount to remove
     function _removeFungible(uint256 positionId, Fungible fungible, uint256 amount) private {
         Position storage s_position = s_positions[positionId];
-        if (s_position.fungibleAssets[fungible].balance < amount) {
-            revert FungibleBalanceInsufficient();
-        }
+        if (s_position.fungibleAssets[fungible].balance < amount) revert FungibleBalanceInsufficient();
 
         s_position.removeFungible(fungible, amount);
         s_positions[GLOBAL_POSITION_ID].removeFungible(fungible, amount);

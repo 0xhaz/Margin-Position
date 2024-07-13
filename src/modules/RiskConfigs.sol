@@ -42,7 +42,7 @@ abstract contract RiskConfigs is IRiskConfigs {
         emit InterestModeUpdated(riskParams.interestMode);
         emit FeeRateUpdated(riskParams.feeRateUD18);
         emit MaxDebtRatioUpdated(riskParams.maxDebtRatioUD18);
-        emit MaxInterestRateUpdated(riskParams.maxInterestRateUD18);
+        emit MaxExchangeRateAdjRatioUpdated(riskParams.maxExchangeRateAdjRatioUD18);
     }
 
     /// @inheritdoc IRiskConfigs
@@ -81,7 +81,7 @@ abstract contract RiskConfigs is IRiskConfigs {
 
     /// @inheritdoc IRiskConfigs
     function setMaxInterestRate(uint40 maxInterestRateUD18) external riskGovernorOnly {
-        if (maxInterestRateUD18 == 0 || maxInterestRateUD18 > Constants.ONE_HUNDREDTH_MILLIONTH_UD18) {
+        if (maxInterestRateUD18 == 0 || maxInterestRateUD18 > Constants.ONE_HUNDRED_MILLIONTH_UD18) {
             revert InvalidMaxInterestRate();
         }
 
@@ -106,6 +106,8 @@ abstract contract RiskConfigs is IRiskConfigs {
         }
 
         s_riskParams.maxExchangeRateAdjRatioUD18 = maxExchangeRateAdjRatioUD18;
+
+        emit MaxExchangeRateAdjRatioUpdated(maxExchangeRateAdjRatioUD18);
     }
 
     /// @inheritdoc IRiskConfigs

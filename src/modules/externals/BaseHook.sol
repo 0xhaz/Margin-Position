@@ -6,7 +6,7 @@ import {Hooks, IHooks, IPoolManager, PoolKey, BalanceDelta, BeforeSwapDelta} fro
 /// @notice Abstract contract for implementing hooks
 abstract contract BaseHook is IHooks {
     /// @notice The pool manager contract
-    IPoolManager public immutable s_poolManager;
+    IPoolManager internal immutable s_poolManager;
 
     /// @notice Thrown when the caller is not the pool manager
     error NotPoolManager();

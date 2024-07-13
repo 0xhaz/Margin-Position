@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.24;
+pragma solidity >=0.8.0;
 
 import {IERC721} from "forge-std/interfaces/IERC721.sol";
 
@@ -19,9 +19,6 @@ function equals(NonFungible a, NonFungible b) pure returns (bool) {
 
 /// @notice Library for working with non-fungibles, supports both ERC721 tokens
 library NonFungibleLibrary {
-    /// @notice Thrown when a transfer fails
-    error NonFungibleTransferFailed();
-
     /// @notice Transfers a non-fungible from the current contract to a recipient
     /// @dev Uses the safe transfer method so a receiving smart contract must implement the IERC721TokenReceiver interface
     /// @param self The non-fungible to transfer

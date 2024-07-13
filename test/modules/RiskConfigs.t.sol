@@ -59,7 +59,7 @@ contract RiskConfigTest is Test {
         vm.expectRevert(IRiskConfigs.NotRiskGovernor.selector);
         riskGovernor2.setMaxInterestRate(riskConfigs, maxInterestRateUD18);
 
-        if (maxInterestRateUD18 == 0 || maxInterestRateUD18 > Constants.ONE_HUNDREDTH_MILLIONTH_UD18) {
+        if (maxInterestRateUD18 == 0 || maxInterestRateUD18 > Constants.ONE_HUNDRED_MILLIONTH_UD18) {
             vm.expectRevert(IRiskConfigs.InvalidMaxInterestRate.selector);
             riskGovernor1.setMaxInterestRate(riskConfigs, maxInterestRateUD18);
         } else {

@@ -10,7 +10,7 @@ library Constants {
     /// @notice Constant for representing 1 in UD18 notation
     uint64 internal constant ONE_UD18 = 1e18;
     /// @notice Constant for representing 1 / 100_000_000 in UD18 notation
-    uint64 internal constant ONE_HUNDREDTH_MILLIONTH_UD18 = 1e10;
+    uint64 internal constant ONE_HUNDRED_MILLIONTH_UD18 = 1e10;
     /// @notice Constant for representing 1 / 1_000_000_000 in UD18 notation
     uint64 internal constant ONE_BILLIONTH_UD18 = 1e9;
     /// @notice Constant for representing 1 in pips notation

@@ -211,8 +211,7 @@ library PositionLibrary {
         uint256 baseMarginReq; // tracks margin requirement in the native fungible
 
         Fungible[] memory fungibles = s_self.fungibles;
-        uint256 len = fungibles.length;
-        for (uint256 i; i < len; ++i) {
+        for (uint256 i; i < fungibles.length; i++) {
             Fungible fungible = fungibles[i];
             uint256 amount = s_self.fungibleAssets[fungible].balance;
 
@@ -227,19 +226,17 @@ library PositionLibrary {
         }
 
         NonFungible[] memory nonFungibles = s_self.nonFungibles;
-        len = nonFungibles.length;
-        for (uint256 i; i < len; ++i) {
+        for (uint256 i; i < nonFungibles.length; i++) {
             NonFungible nonFungible = nonFungibles[i];
             (uint64 marginReqRatioUD18, IOracle oracle, bytes memory oracleData) =
                 riskConfigs.riskParamsOf(NonFungible.unwrap(nonFungible));
 
             if (address(oracle) == address(0)) continue; // skip unsupported non-fungible
             uint256[] memory items = s_self.nonFungibleAssets[nonFungible].items;
-            uint256 itemsLen = items.length;
 
             if (marginReqRatioUD18 != 0) {
                 // we can appraise the non-fungible as a whole
-                for (uint256 j; j < itemsLen; ++j) {
+                for (uint256 j; j < items.length; j++) {
                     uint256 baseValue_ = oracle.quoteNonFungibleInNative(nonFungible, items[j], oracleData);
 
                     baseValue += baseValue_;
@@ -247,12 +244,11 @@ library PositionLibrary {
                 }
             } else {
                 // we need to decompose the non-fungible
-                for (uint256 j; j < itemsLen; ++j) {
+                for (uint256 j; j < items.length; j++) {
                     (Fungible[] memory fungibles_, uint256[] memory amounts) =
                         oracle.decomposeNonFungible(nonFungible, items[j], oracleData);
 
-                    uint256 fungiblesLen = fungibles_.length;
-                    for (uint256 k; k < fungiblesLen; ++k) {
+                    for (uint256 k; k < fungibles_.length; ++k) {
                         if (fungibles_[k] == quoteFungible) {
                             value += amounts[k];
                         } else {

@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.8.0;
 
-import {IRiskConfigs, IRiskGovernor, IOracle} from "src/interfaces/IRiskConfigs.sol";
+import {IRiskConfigs, IRiskGovernor, IOracle} from "../../src/interfaces/IRiskConfigs.sol";
 
 contract TestRiskGovernor is IRiskGovernor {
     function appointNextRiskGovernor(IRiskConfigs riskConfigs, IRiskGovernor riskGovernorNext) external {
